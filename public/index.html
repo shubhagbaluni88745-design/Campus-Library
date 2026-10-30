@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Campus Library</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Campus Library</h1>
+      <p class="sub">Authors and their books &mdash; data served by GraphQL</p>
+    </header>
+
+    <!-- Success / Error notification banner -->
+    <div id="alertContainer" role="status" aria-live="polite"></div>
+
+    <!-- Author & Book Listing -->
+    <main>
+      <div id="list">
+        <div class="loading-box">
+          <div class="spinner"></div>
+          <div>Loading authors and books&hellip;</div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Add Book Form -->
+    <section>
+      <form id="addForm">
+        <h3>Add a book</h3>
+        <div class="form-row">
+          <input id="title" name="title" placeholder="Book title" required aria-label="Book title">
+          <input id="year" name="year" type="number" placeholder="Year" min="1000" max="2100" aria-label="Publication year">
+          <select id="authorId" name="authorId" required aria-label="Select author">
+            <option value="" disabled selected>Select author&hellip;</option>
+          </select>
+          <button id="submitBtn" type="submit">
+            <span>Add book</span>
+          </button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <script>
+    const API = 'http://localhost:4000/';
+
+    // Helper: Safely escape HTML to prevent XSS in rendering
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // Helper: Display floating or top alert notification
+    function showAlert(message, type = 'success') {
+      const container = document.getElementById('alertContainer');
+      const alertDiv = document.createElement('div');
+      alertDiv.className = `alert alert-${type}`;
+      alertDiv.innerHTML = `
+        <span>${escapeHtml(message)}</span>
+        <button type="button" class="close-btn" aria-label="Dismiss">&times;</button>
+      `;
+      alertDiv.querySelector('.close-btn').addEventListener('click', () => {
+        alertDiv.remove();
+      });
+      container.innerHTML = '';
+      container.appendChild(alertDiv);
+
+      if (type === 'success') {
+        setTimeout(() => {
+          if (alertDiv.parentElement) {
+            alertDiv.remove();
+          }
+        }, 5000);
+      }
+    }
+
+    // Helper: Send a GraphQL query/mutation to the API with robust error handling
+    async function gql(query, variables) {
+      let res;
+      try {
+        res = await fetch(API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, variables }),
+        });
+      } catch (networkErr) {
+        throw new Error(`Cannot connect to GraphQL API at ${API}. Ensure the server is running on port 4000.`);
+      }
+
+      if (!res.ok) {
+        throw new Error(`Server returned HTTP ${res.status}: ${res.statusText}`);
+      }
+
+      const json = await res.json();
+      if (json.errors && json.errors.length > 0) {
+        throw new Error(json.errors.map(e => e.message).join(' | '));
+      }
+      return json.data;
+    }
+
+    // 1. READ: Load all authors with their books and dynamically populate the dropdown
+    async function load() {
+      const listEl = document.getElementById('list');
+      const selectEl = document.getElementById('authorId');
+
+      try {
+        const data = await gql(`
+          query {
+            authors {
+              id
+              name
+              country
+              books {
+                title
+                year
+              }
+            }
+          }
+        `);
+
+        if (!data || !data.authors || data.authors.length === 0) {
+          listEl.innerHTML = '<div class="empty-state">No authors found in the library database.</div>';
+          selectEl.innerHTML = '<option value="" disabled selected>No authors available</option>';
+          return;
+        }
+
+        // Render author cards
+        listEl.innerHTML = data.authors.map(a => `
+          <div class="author-card">
+            <div class="author-header">
+              <h2>${escapeHtml(a.name)}</h2>
+              <span class="badge">${a.books.length} ${a.books.length === 1 ? 'book' : 'books'}</span>
+            </div>
+            <div class="country">${escapeHtml(a.country || '')}</div>
+            <div class="books-list">
+              ${a.books.length > 0
+                ? a.books.map(b => `
+                    <div class="book">
+                      <span class="book-title">${escapeHtml(b.title)}</span>
+                      <span class="yr">(${b.year !== null && b.year !== undefined ? b.year : 'N/A'})</span>
+                    </div>
+                  `).join('')
+                : '<div class="empty-books">No books recorded yet.</div>'
+              }
+            </div>
+          </div>
+        `).join('');
+
+        // Dynamically populate author dropdown while preserving current selection
+        const previousVal = selectEl.value;
+        selectEl.innerHTML = `
+          <option value="" disabled ${!previousVal ? 'selected' : ''}>Select author&hellip;</option>
+          ${data.authors.map(a => `
+            <option value="${escapeHtml(a.id)}">${escapeHtml(a.name)}</option>
+          `).join('')}
+        `;
+        if (previousVal && data.authors.some(a => String(a.id) === String(previousVal))) {
+          selectEl.value = previousVal;
+        }
+
+      } catch (err) {
+        listEl.innerHTML = `
+          <div class="empty-state" style="border-color: var(--error-border); color: var(--error-text);">
+            <strong>Error loading library data:</strong><br>${escapeHtml(err.message)}
+          </div>
+        `;
+        showAlert(err.message, 'error');
+      }
+    }
+
+    // 2. WRITE: Add a book via GraphQL mutation, then refresh the list
+    document.getElementById('addForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const submitBtn = document.getElementById('submitBtn');
+      const titleInput = document.getElementById('title');
+      const yearInput = document.getElementById('year');
+      const authorSelect = document.getElementById('authorId');
+
+      const title = titleInput.value.trim();
+      const yearRaw = yearInput.value.trim();
+      const authorId = authorSelect.value;
+
+      // Client-side validations
+      if (!title) {
+        showAlert('Please enter a book title.', 'error');
+        titleInput.focus();
+        return;
+      }
+
+      let year = null;
+      if (yearRaw) {
+        year = Number(yearRaw);
+        if (isNaN(year) || year < 1000 || year > 2100) {
+          showAlert('Please enter a valid 4-digit publication year (between 1000 and 2100).', 'error');
+          yearInput.focus();
+          return;
+        }
+      }
+
+      if (!authorId) {
+        showAlert('Please select an author from the dropdown.', 'error');
+        authorSelect.focus();
+        return;
+      }
+
+      try {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span>Adding&hellip;</span>';
+
+        const mutation = `
+          mutation($t: String!, $y: Int, $a: ID!) {
+            addBook(title: $t, year: $y, authorId: $a) {
+              id
+              title
+              year
+            }
+          }
+        `;
+
+        const data = await gql(mutation, { t: title, y: year, a: authorId });
+
+        showAlert(`Successfully added "${data.addBook.title}" (${data.addBook.year || 'N/A'})!`, 'success');
+
+        // Reset form inputs and reload list
+        e.target.reset();
+        await load();
+
+      } catch (err) {
+        showAlert(err.message, 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>Add book</span>';
+      }
+    });
+
+    // Initial load
+    load();
+  </script>
+</body>
+</html>

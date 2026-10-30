@@ -1,0 +1,33 @@
+{
+  "name": "campus-library",
+  "version": "1.0.0",
+  "description": "Campus Library GraphQL API and Frontend - CS543 Assignment",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node test-backend.js",
+    "test:e2e": "node test-frontend.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shubhagbaluni88745-design/Campus-Library.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/shubhagbaluni88745-design/Campus-Library/issues"
+  },
+  "homepage": "https://github.com/shubhagbaluni88745-design/Campus-Library#readme",
+  "dependencies": {
+    "@apollo/server": "^5.5.1",
+    "dotenv": "^18.0.9",
+    "graphql": "^16.14.2",
+    "mysql2": "^3.24.6"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.16.0"
+  }
+}
