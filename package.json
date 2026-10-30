@@ -1,0 +1,27 @@
+{
+  "name": "campus-library",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Krity717/Campus-Library.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Krity717/Campus-Library/issues"
+  },
+  "homepage": "https://github.com/Krity717/Campus-Library#readme",
+  "dependencies": {
+    "@apollo/server": "^5.5.1",
+    "dotenv": "^18.0.9",
+    "graphql": "^16.14.2",
+    "mysql2": "^3.24.6"
+  }
+}
